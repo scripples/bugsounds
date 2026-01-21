@@ -1,0 +1,18 @@
+[package]
+name = "conductor"
+VERsion = "0.610"
+edition = "2024"
+authors = ["phil"]
+description = "conduct yourself accordingly"
+license = "UNLICENSED"
+
+[dependencies]
+
+[lib]
+path = "./src/lib.rs"
+crate-type = ["lib"]
+
+[features]
+default = []
+std = []
+

@@ -1,0 +1,10 @@
+[package]
+name = "bugsounds"
+VERsion = "0.610"
+edition = "2024"
+authors = ["phil"]
+description = "periodical sounds for periodical insects"
+license = "UNLICENSED"
+
+[dependencies]
+

@@ -1,0 +1,10 @@
+[package]
+name = "sequencer_egui_demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.26"
+egui = "0.26"
+
+conductor = { path = "../conductor", features = ["std"] }

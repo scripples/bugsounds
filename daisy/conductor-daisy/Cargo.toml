@@ -1,0 +1,19 @@
+[package]
+name = "conductor-daisy"
+VERsion = "0.610"
+edition = "2024"
+authors = ["phil"]
+description = "conduct yourself accordingly"
+license = "UNLICENSED"
+
+[dependencies]
+# Low level access to Cortex-M processors
+cortex-m = "0.7.7"
+# Real-Time Interrupt-driven Concurrency (RTIC): a concurrency framework for building real-time systems
+cortex-m-rtic = "1.1.4"
+libdaisy = { version = "0.1.0",  features = ["log-rtt"], git = "https://github.com/mtthw-meyer/libdaisy-rust.git" }
+log = "0.4.29"
+stm32h7xx-hal = "0.16.0"
+
+[build]
+target = "thumbv7em-none-eabihf"
