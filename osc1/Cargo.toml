@@ -1,0 +1,13 @@
+[package]
+name = "bugsound-test"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cpal = "0.17.3"
+eframe = "0.33"
+fundsp = "0.23.0"
+
+[[bin]]
+name = "gui"
+path = "src/bin/gui.rs"
