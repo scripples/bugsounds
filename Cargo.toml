@@ -15,7 +15,10 @@ members = [
     "conductor",
     "egui-demo",
     "daisy/conductor-daisy",
-    "snyth", "snyth",
+    "snyth",
+    "osc1",
+    "gui/osc1-gui",
+    "gui/wavetable3d-gui",
 ]
 resolver = "3"
 
@@ -24,5 +27,7 @@ license = "UNLICENSED"
 edition = "2024"
 
 [workspace.dependencies]
-cpal = "0.17.0"
-fundsp = "0.20.0"
+cpal = "0.17.3"
+eframe = "0.33"
+fundsp = "0.23.0"
+hound = "3.5"

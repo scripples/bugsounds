@@ -5,10 +5,10 @@ use fundsp::prelude::Shared;
 
 struct SynthApp {
     f0: f32,
-    f1: f32,
+    ratio: f32,
     m0: f32,
     f0s: Shared,
-    f1s: Shared,
+    ratios: Shared,
     m0s: Shared,
 }
 
@@ -17,22 +17,22 @@ impl eframe::App for SynthApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Synth");
             if ui
-                .add(egui::Slider::new(&mut self.f0, 20.0..=2000.0).text("Frequency (Hz)"))
+                .add(egui::Slider::new(&mut self.f0, 20.0..=2000.0).text("Carrier Freq (Hz)"))
                 .changed()
             {
                 self.f0s.set(self.f0);
             }
             if ui
-                .add(egui::Slider::new(&mut self.f1, 20.0..=2000.0).text("Frequency (Hz)"))
+                .add(egui::Slider::new(&mut self.ratio, 0.25..=8.0).text("Mod Ratio"))
                 .changed()
             {
-                self.f1s.set(self.f1);
+                self.ratios.set(self.ratio);
             }
             if ui
-                .add(egui::Slider::new(&mut self.m0, 20.0..=2000.0).text("Frequency (Hz)"))
+                .add(egui::Slider::new(&mut self.m0, 0.0..=5.0).text("Mod Index"))
                 .changed()
             {
-                self.f0s.set(self.m0);
+                self.m0s.set(self.m0);
             }
         });
     }
@@ -41,7 +41,7 @@ impl eframe::App for SynthApp {
 fn main() -> eframe::Result {
     let mut synth = Synth::new(440.0);
     let f0s = synth.f0();
-    let f1s = synth.f1();
+    let ratios = synth.ratio();
     let m0s = synth.m0();
     let graph = synth.take_graph();
 
@@ -55,8 +55,8 @@ fn main() -> eframe::Result {
             Ok(Box::new(SynthApp {
                 f0: 440.0,
                 f0s,
-                f1: 440.0,
-                f1s,
+                ratio: 1.0,
+                ratios,
                 m0: 1.0,
                 m0s,
             }))
