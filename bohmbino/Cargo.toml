@@ -1,5 +1,5 @@
 [package]
-name = "bugsound-test"
+name = "bohmbino"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,6 +9,4 @@ audio-output = ["dep:cpal"]
 
 [dependencies]
 cpal = { workspace = true, optional = true }
-eframe.workspace = true
 fundsp.workspace = true
-hound.workspace = true

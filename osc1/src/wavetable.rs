@@ -23,15 +23,21 @@ impl WavetableBank {
     }
 
     /// Read a sample from wave (x, y) at a fractional phase [0.0, 1.0),
-    /// with linear interpolation between adjacent samples.
+    /// using nearest-neighbor lookup (no interpolation).
     pub fn sample_at(&self, x: usize, y: usize, phase: f32) -> f32 {
         let offset = (y * BANK_DIM + x) * WAVE_SIZE;
+        // nearest-neighbor interpolation
+        let idx = (phase * WAVE_SIZE as f32) as usize % WAVE_SIZE;
+        self.samples[offset + idx]
+    }
+
+    pub fn sample_at_interpolate(&self, x: usize, y: usize, phase: f32) -> f32 {
+        let offset = (y * BANK_DIM + x) * WAVE_SIZE;
         let pos = phase * WAVE_SIZE as f32;
-        let idx = pos as usize;
-        let frac = pos - idx as f32;
-        let a = self.samples[offset + (idx % WAVE_SIZE)];
-        let b = self.samples[offset + ((idx + 1) % WAVE_SIZE)];
-        lerp(a, b, frac)
+        let idx0 = pos as usize % WAVE_SIZE;
+        let idx1 = (idx0 + 1) % WAVE_SIZE;
+        let frac = pos - pos.floor();
+        lerp(self.samples[offset + idx0], self.samples[offset + idx1], frac)
     }
 }
 
@@ -47,7 +53,7 @@ impl WavetableSet {
     /// x, y, z should be in [0.0, 7.0]. Values between integer
     /// positions are linearly interpolated across all three axes.
     pub fn sample_trilinear(&self, x: f32, y: f32, z: f32, phase: f32) -> f32 {
-        let max = (BANK_DIM - 2) as f32;
+        let max = (BANK_DIM - 1) as f32;
 
         let x = x.clamp(0.0, max + 1.0);
         let y = y.clamp(0.0, max + 1.0);
@@ -62,14 +68,14 @@ impl WavetableSet {
         let zf = z - zi as f32;
 
         // Sample all 8 corners of the cube
-        let s000 = self.banks[zi].sample_at(xi, yi, phase);
-        let s100 = self.banks[zi].sample_at(xi + 1, yi, phase);
-        let s010 = self.banks[zi].sample_at(xi, yi + 1, phase);
-        let s110 = self.banks[zi].sample_at(xi + 1, yi + 1, phase);
-        let s001 = self.banks[zi + 1].sample_at(xi, yi, phase);
-        let s101 = self.banks[zi + 1].sample_at(xi + 1, yi, phase);
-        let s011 = self.banks[zi + 1].sample_at(xi, yi + 1, phase);
-        let s111 = self.banks[zi + 1].sample_at(xi + 1, yi + 1, phase);
+        let s000 = self.banks[zi].sample_at_interpolate(xi, yi, phase);
+        let s100 = self.banks[zi].sample_at_interpolate(xi + 1, yi, phase);
+        let s010 = self.banks[zi].sample_at_interpolate(xi, yi + 1, phase);
+        let s110 = self.banks[zi].sample_at_interpolate(xi + 1, yi + 1, phase);
+        let s001 = self.banks[zi + 1].sample_at_interpolate(xi, yi, phase);
+        let s101 = self.banks[zi + 1].sample_at_interpolate(xi + 1, yi, phase);
+        let s011 = self.banks[zi + 1].sample_at_interpolate(xi, yi + 1, phase);
+        let s111 = self.banks[zi + 1].sample_at_interpolate(xi + 1, yi + 1, phase);
 
         // Interpolate along X
         let c00 = lerp(s000, s100, xf);
@@ -83,6 +89,15 @@ impl WavetableSet {
 
         // Interpolate along Z
         lerp(c0, c1, zf)
+    }
+
+    /// Sample the nearest whole waveform (no crossfading between positions).
+    pub fn sample_nearest(&self, x: f32, y: f32, z: f32, phase: f32) -> f32 {
+        let max = (BANK_DIM - 1) as f32;
+        let xi = (x.round() as usize).min(BANK_DIM - 1);
+        let yi = (y.round() as usize).min(BANK_DIM - 1);
+        let zi = (z.round() as usize).min(BANK_DIM - 1);
+        self.banks[zi].sample_at_interpolate(xi, yi, phase)
     }
 }
 

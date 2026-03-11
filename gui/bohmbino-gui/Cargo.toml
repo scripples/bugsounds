@@ -1,0 +1,10 @@
+[package]
+name = "bohmbino-gui"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+bohmbino = { path = "../../bohmbino" }
+eframe.workspace = true
+fundsp.workspace = true

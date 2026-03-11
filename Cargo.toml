@@ -19,6 +19,8 @@ members = [
     "osc1",
     "gui/osc1-gui",
     "gui/wavetable3d-gui",
+    "bohmbino",
+    "gui/bohmbino-gui",
 ]
 resolver = "3"
 

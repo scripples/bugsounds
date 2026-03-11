@@ -999,6 +999,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "bohmbino"
+version = "0.1.0"
+dependencies = [
+ "cpal",
+ "fundsp",
+]
+
+[[package]]
+name = "bohmbino-gui"
+version = "0.1.0"
+dependencies = [
+ "bohmbino",
+ "eframe 0.33.3",
+ "fundsp",
+]
+
+[[package]]
 name = "bugsound-test"
 version = "0.1.0"
 dependencies = [
