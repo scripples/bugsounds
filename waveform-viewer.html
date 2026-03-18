@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waveform Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    background: #0a0a0f;
+    color: #c8c8d0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 16px;
+    background: #14141c;
+    border-bottom: 1px solid #2a2a3a;
+    flex-wrap: wrap;
+  }
+  .toolbar label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8888a0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .toolbar input[type="range"] {
+    width: 120px;
+    accent-color: #5b8af0;
+  }
+  .toolbar input[type="number"] {
+    width: 72px;
+    background: #1a1a28;
+    border: 1px solid #2a2a3a;
+    color: #c8c8d0;
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 12px;
+  }
+  .toolbar input[type="file"] { display: none; }
+  .toolbar button, .toolbar .file-label {
+    background: #1e1e30;
+    border: 1px solid #3a3a50;
+    color: #c8c8d0;
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+  }
+  .toolbar button:hover, .toolbar .file-label:hover {
+    background: #2a2a40;
+    border-color: #5b8af0;
+  }
+  .sep {
+    width: 1px;
+    height: 24px;
+    background: #2a2a3a;
+  }
+
+  .canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .info-bar {
+    display: flex;
+    gap: 20px;
+    padding: 4px 16px;
+    background: #14141c;
+    border-top: 1px solid #2a2a3a;
+    font-size: 11px;
+    color: #666880;
+  }
+  .info-bar span { white-space: nowrap; }
+
+  .grid-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 8px;
+    background: #181824;
+    border: 1px solid #2a2a3a;
+    border-radius: 4px;
+  }
+  .grid-controls label { color: #a0a0c0; }
+
+  .checkbox-label {
+    cursor: pointer;
+    user-select: none;
+  }
+  .checkbox-label input[type="checkbox"] {
+    accent-color: #5b8af0;
+    margin-right: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <label class="file-label">
+    Load Audio
+    <input type="file" id="fileInput" accept="audio/*,.wav,.mp3,.ogg,.flac">
+  </label>
+
+  <div class="sep"></div>
+
+  <label>
+    Zoom
+    <input type="range" id="zoomSlider" min="0" max="1000" value="0">
+  </label>
+
+  <label>
+    Offset
+    <input type="range" id="offsetSlider" min="0" max="1000" value="0">
+  </label>
+
+  <label>
+    Amp
+    <input type="range" id="ampSlider" min="0" max="1000" value="500">
+    <span id="ampDisplay" style="font-size:11px;min-width:32px;">1.0x</span>
+  </label>
+
+  <div class="sep"></div>
+
+  <div class="grid-controls">
+    <label class="checkbox-label">
+      <input type="checkbox" id="gridToggle"> Grid Lines
+    </label>
+    <label>
+      Interval (bytes)
+      <input type="number" id="gridInterval" value="882" min="1" step="1">
+    </label>
+    <label>
+      Offset (bytes)
+      <input type="number" id="gridOffset" value="0" min="0" step="1">
+    </label>
+    <label>
+      Bit Depth
+      <select id="bitDepth" style="background:#1a1a28;border:1px solid #2a2a3a;color:#a0a0c0;padding:3px 6px;border-radius:3px;font-family:inherit;font-size:12px;">
+        <option value="1">8-bit (1B)</option>
+        <option value="2" selected>16-bit (2B)</option>
+        <option value="3">24-bit (3B)</option>
+        <option value="4">32-bit (4B)</option>
+      </select>
+    </label>
+    <label>
+      Color
+      <input type="color" id="gridColor" value="#ff4466" style="width:28px;height:22px;border:none;background:none;cursor:pointer;">
+    </label>
+  </div>
+
+  <div class="sep"></div>
+
+  <label>
+    Channel
+    <select id="channelSelect" style="background:#1a1a28;border:1px solid #2a2a3a;color:#c8c8d0;padding:3px 6px;border-radius:3px;font-family:inherit;font-size:12px;">
+      <option value="0">L</option>
+      <option value="1">R</option>
+      <option value="mix">Mix</option>
+    </select>
+  </label>
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="waveCanvas"></canvas>
+</div>
+
+<div class="info-bar">
+  <span id="infoFile">No file loaded</span>
+  <span id="infoSample">Sample Rate: —</span>
+  <span id="infoDuration">Duration: —</span>
+  <span id="infoView">View: —</span>
+  <span id="infoCursor">Cursor: —</span>
+</div>
+
+<script>
+const canvas = document.getElementById('waveCanvas');
+const ctx = canvas.getContext('2d');
+
+const zoomSlider = document.getElementById('zoomSlider');
+const offsetSlider = document.getElementById('offsetSlider');
+const gridToggle = document.getElementById('gridToggle');
+const gridInterval = document.getElementById('gridInterval');
+const gridOffset = document.getElementById('gridOffset');
+const gridColor = document.getElementById('gridColor');
+const bitDepth = document.getElementById('bitDepth');
+const ampSlider = document.getElementById('ampSlider');
+const ampDisplay = document.getElementById('ampDisplay');
+const channelSelect = document.getElementById('channelSelect');
+const fileInput = document.getElementById('fileInput');
+
+let audioBuffer = null;
+let viewStart = 0;   // in samples
+let viewLength = 0;  // in samples
+let totalSamples = 0;
+let isDragging = false;
+let dragStartX = 0;
+let dragStartOffset = 0;
+
+// --- File loading ---
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const arrayBuf = await file.arrayBuffer();
+  audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
+  totalSamples = audioBuffer.length;
+
+  document.getElementById('infoFile').textContent = file.name;
+  document.getElementById('infoSample').textContent = `Sample Rate: ${audioBuffer.sampleRate} Hz`;
+  document.getElementById('infoDuration').textContent = `Duration: ${audioBuffer.duration.toFixed(3)}s (${totalSamples} samples)`;
+
+  // Reset view
+  viewStart = 0;
+  viewLength = totalSamples;
+  zoomSlider.value = 0;
+  offsetSlider.value = 0;
+
+  draw();
+});
+
+// --- Zoom: exponential mapping ---
+function getViewLength() {
+  if (!audioBuffer) return 0;
+  const t = parseInt(zoomSlider.value) / 1000;
+  // Exponential zoom: full view at 0, down to 64 samples at 1000
+  const minLen = 64;
+  const maxLen = totalSamples;
+  return Math.round(maxLen * Math.pow(minLen / maxLen, t));
+}
+
+function getViewStart() {
+  if (!audioBuffer) return 0;
+  const maxOffset = Math.max(0, totalSamples - viewLength);
+  return Math.round((parseInt(offsetSlider.value) / 1000) * maxOffset);
+}
+
+function updateView() {
+  viewLength = getViewLength();
+  viewStart = getViewStart();
+  updateInfoView();
+  draw();
+}
+
+function updateInfoView() {
+  const end = viewStart + viewLength;
+  document.getElementById('infoView').textContent =
+    `View: ${viewStart}–${end} (${viewLength} samples)`;
+}
+
+// --- Amplitude zoom: exponential 0.01x to 100x, center (500) = 1x ---
+function getAmpGain() {
+  const t = (parseInt(ampSlider.value) - 500) / 500; // -1 to +1
+  return Math.pow(100, t); // 0.01x at 0, 1x at 500, 100x at 1000
+}
+
+ampSlider.addEventListener('input', () => {
+  const gain = getAmpGain();
+  if (gain < 0.1) ampDisplay.textContent = gain.toFixed(3) + 'x';
+  else if (gain < 10) ampDisplay.textContent = gain.toFixed(1) + 'x';
+  else ampDisplay.textContent = Math.round(gain) + 'x';
+  draw();
+});
+
+zoomSlider.addEventListener('input', updateView);
+offsetSlider.addEventListener('input', updateView);
+gridToggle.addEventListener('change', draw);
+gridInterval.addEventListener('input', draw);
+gridOffset.addEventListener('input', draw);
+gridColor.addEventListener('input', draw);
+bitDepth.addEventListener('change', draw);
+channelSelect.addEventListener('change', draw);
+
+// --- Mouse wheel zoom ---
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (!audioBuffer) return;
+
+  // Zoom centered on cursor position
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = (e.clientX - rect.left) / rect.width;
+  const cursorSample = viewStart + mouseX * viewLength;
+
+  // Adjust zoom slider
+  const delta = e.deltaY > 0 ? -20 : 20;
+  zoomSlider.value = Math.max(0, Math.min(1000, parseInt(zoomSlider.value) + delta));
+
+  const newViewLength = getViewLength();
+  // Recalculate offset to keep cursor sample at same screen position
+  const newStart = cursorSample - mouseX * newViewLength;
+  const maxOffset = Math.max(0, totalSamples - newViewLength);
+  const clampedStart = Math.max(0, Math.min(maxOffset, newStart));
+
+  viewLength = newViewLength;
+  viewStart = Math.round(clampedStart);
+
+  // Update offset slider to match
+  if (maxOffset > 0) {
+    offsetSlider.value = Math.round((viewStart / maxOffset) * 1000);
+  }
+
+  updateInfoView();
+  draw();
+}, { passive: false });
+
+// --- Mouse drag for panning ---
+canvas.addEventListener('mousedown', (e) => {
+  if (!audioBuffer) return;
+  isDragging = true;
+  dragStartX = e.clientX;
+  dragStartOffset = viewStart;
+  canvas.style.cursor = 'grabbing';
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!audioBuffer) return;
+
+  // Update cursor info
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = (e.clientX - rect.left) / rect.width;
+  const sample = Math.round(viewStart + mouseX * viewLength);
+  if (sample >= 0 && sample < totalSamples) {
+    const time = (sample / audioBuffer.sampleRate).toFixed(6);
+    document.getElementById('infoCursor').textContent = `Cursor: sample ${sample} (${time}s)`;
+  }
+
+  if (!isDragging) return;
+
+  const dx = e.clientX - dragStartX;
+  const samplesPerPixel = viewLength / canvas.clientWidth;
+  const newStart = dragStartOffset - dx * samplesPerPixel;
+  const maxOffset = Math.max(0, totalSamples - viewLength);
+  viewStart = Math.round(Math.max(0, Math.min(maxOffset, newStart)));
+
+  if (maxOffset > 0) {
+    offsetSlider.value = Math.round((viewStart / maxOffset) * 1000);
+  }
+
+  updateInfoView();
+  draw();
+});
+
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+  canvas.style.cursor = '';
+});
+
+// --- Drawing ---
+function draw() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const w = rect.width;
+  const h = rect.height;
+
+  // Background
+  ctx.fillStyle = '#0a0a0f';
+  ctx.fillRect(0, 0, w, h);
+
+  if (!audioBuffer) {
+    ctx.fillStyle = '#4a4a60';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Load an audio file to begin', w / 2, h / 2);
+    return;
+  }
+
+  const midY = h / 2;
+
+  // Get sample data
+  const channelVal = channelSelect.value;
+  let data;
+  if (channelVal === 'mix' || audioBuffer.numberOfChannels === 1) {
+    const ch0 = audioBuffer.getChannelData(0);
+    if (audioBuffer.numberOfChannels > 1) {
+      const ch1 = audioBuffer.getChannelData(1);
+      data = new Float32Array(totalSamples);
+      for (let i = 0; i < totalSamples; i++) {
+        data[i] = (ch0[i] + ch1[i]) * 0.5;
+      }
+    } else {
+      data = ch0;
+    }
+  } else {
+    const chIdx = parseInt(channelVal);
+    data = audioBuffer.getChannelData(Math.min(chIdx, audioBuffer.numberOfChannels - 1));
+  }
+
+  // Draw center line
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, midY);
+  ctx.lineTo(w, midY);
+  ctx.stroke();
+
+  // Draw amplitude guides
+  ctx.strokeStyle = '#12121e';
+  for (const amp of [0.25, 0.5, 0.75, 1.0]) {
+    const y1 = midY - amp * midY;
+    const y2 = midY + amp * midY;
+    ctx.beginPath();
+    ctx.moveTo(0, y1); ctx.lineTo(w, y1);
+    ctx.moveTo(0, y2); ctx.lineTo(w, y2);
+    ctx.stroke();
+  }
+
+  // Draw grid lines (byte interval markers)
+  if (gridToggle.checked) {
+    const bytesPerSample = parseInt(bitDepth.value) || 2;
+    const intervalBytes = Math.max(1, parseInt(gridInterval.value) || 882);
+    const offsetBytes = Math.max(0, parseInt(gridOffset.value) || 0);
+    const color = gridColor.value;
+
+    // Convert byte positions to fractional sample positions
+    const intervalSamples = intervalBytes / bytesPerSample;
+    const offsetSamples = offsetBytes / bytesPerSample;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.6;
+
+    // Find first grid line in view
+    let firstGridIdx;
+    if (viewStart <= offsetSamples) {
+      firstGridIdx = 0;
+    } else {
+      firstGridIdx = Math.ceil((viewStart - offsetSamples) / intervalSamples);
+    }
+
+    const endSample = viewStart + viewLength;
+    for (let i = firstGridIdx; ; i++) {
+      const s = offsetSamples + i * intervalSamples;
+      if (s >= endSample) break;
+      const x = ((s - viewStart) / viewLength) * w;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+
+      // Draw byte position at top
+      const bytePos = offsetBytes + i * intervalBytes;
+      ctx.globalAlpha = 0.4;
+      ctx.fillStyle = color;
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(bytePos.toString() + 'B', x, 10);
+      ctx.globalAlpha = 0.6;
+    }
+
+    ctx.globalAlpha = 1.0;
+  }
+
+  // Draw waveform
+  const ampGain = getAmpGain();
+  const samplesPerPixel = viewLength / w;
+
+  if (samplesPerPixel <= 1) {
+    // Zoomed in: draw individual samples with lines between them
+    ctx.strokeStyle = '#5b8af0';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+
+    for (let px = 0; px < w; px++) {
+      const sampleIdx = Math.round(viewStart + px * samplesPerPixel);
+      if (sampleIdx >= totalSamples) break;
+      const val = data[sampleIdx] * ampGain;
+      const y = midY - val * midY;
+      if (px === 0) ctx.moveTo(px, y);
+      else ctx.lineTo(px, y);
+    }
+    ctx.stroke();
+
+    // Draw sample dots if zoomed in enough
+    if (samplesPerPixel < 0.25) {
+      ctx.fillStyle = '#8ab4ff';
+      for (let s = Math.floor(viewStart); s < viewStart + viewLength && s < totalSamples; s++) {
+        const x = ((s - viewStart) / viewLength) * w;
+        const y = midY - data[s] * ampGain * midY;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  } else {
+    // Zoomed out: draw min/max envelope per pixel
+    ctx.fillStyle = '#2a4a80';
+    ctx.strokeStyle = '#5b8af0';
+    ctx.lineWidth = 1;
+
+    for (let px = 0; px < w; px++) {
+      const startSample = Math.floor(viewStart + px * samplesPerPixel);
+      const endSample = Math.min(Math.ceil(viewStart + (px + 1) * samplesPerPixel), totalSamples);
+
+      let min = 1, max = -1;
+      for (let s = startSample; s < endSample; s++) {
+        const v = data[s];
+        if (v < min) min = v;
+        if (v > max) max = v;
+      }
+
+      const yMin = midY - max * ampGain * midY;
+      const yMax = midY - min * ampGain * midY;
+
+      // Fill envelope
+      ctx.fillRect(px, yMin, 1, Math.max(1, yMax - yMin));
+    }
+  }
+}
+
+// --- Resize handling ---
+const resizeObserver = new ResizeObserver(() => draw());
+resizeObserver.observe(canvas.parentElement);
+
+// Initial draw
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
